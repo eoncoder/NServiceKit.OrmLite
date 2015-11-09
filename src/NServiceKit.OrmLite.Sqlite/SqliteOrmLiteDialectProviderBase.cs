@@ -6,6 +6,8 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using NServiceKit.Text.Common;
+using System.Linq;
+
 
 namespace NServiceKit.OrmLite.Sqlite
 {
@@ -241,8 +243,65 @@ namespace NServiceKit.OrmLite.Sqlite
             // http://www.sqlite.org/lang_createtable.html#rowid
             var ret = base.GetColumnDefinition(fieldName, fieldType, isPrimaryKey, autoIncrement, isNullable, fieldLength, scale, defaultValue);
             if (isPrimaryKey)
-                return ret.Replace(" BIGINT ", " INTEGER ");
+            {
+                ret = ret.Replace(" BIGINT ", " INTEGER ");
+                return ret.Replace("PRIMARY KEY", "");
+            }
             return ret;
+        }
+
+
+        public override string ToCreateTableStatement(Type tableType)
+        {
+            var sbColumns = new StringBuilder();
+            var sbConstraints = new StringBuilder();
+
+            var sbPrimaryKeys = new StringBuilder();
+
+            var modelDef = tableType.GetModelDefinition();
+            foreach (var fieldDef in modelDef.FieldDefinitions)
+            {
+                if (sbColumns.Length != 0) sbColumns.Append(", \n  ");
+
+                var columnDefinition = GetColumnDefinition(
+                    fieldDef.FieldName,
+                    fieldDef.FieldType,
+                    fieldDef.IsPrimaryKey,
+                    fieldDef.AutoIncrement,
+                    fieldDef.IsNullable,
+                    fieldDef.FieldLength,
+                    null,
+                    fieldDef.DefaultValue);
+
+                sbColumns.Append(columnDefinition);
+
+                if (fieldDef.ForeignKey == null)
+                {
+                    continue;
+                }
+
+                var refModelDef = fieldDef.ForeignKey.ReferenceType.GetModelDefinition();
+                sbConstraints.AppendFormat(
+                    ", \n\n  CONSTRAINT {0} FOREIGN KEY ({1}) REFERENCES {2} ({3})",
+                    GetQuotedName(fieldDef.ForeignKey.GetForeignKeyName(modelDef, refModelDef, NamingStrategy, fieldDef)),
+                    GetQuotedColumnName(fieldDef.FieldName),
+                    GetQuotedTableName(refModelDef),
+                    GetQuotedColumnName(refModelDef.PrimaryKey.FieldName));
+
+                sbConstraints.Append(GetForeignKeyOnDeleteClause(fieldDef.ForeignKey));
+                sbConstraints.Append(GetForeignKeyOnUpdateClause(fieldDef.ForeignKey));
+            }
+
+            var v_fieldDefinitionsPrimaryKey = modelDef.FieldDefinitions.Where(x => x.IsPrimaryKey == true);
+            if ( v_fieldDefinitionsPrimaryKey.Count() > 0 )
+            {
+                sbPrimaryKeys.AppendFormat(", PRIMARY KEY({0})", string.Join(",", v_fieldDefinitionsPrimaryKey.Select( x => GetQuotedColumnName( x.FieldName) ).ToArray())) ;
+            }
+
+            var sql = new StringBuilder(string.Format(
+                "CREATE TABLE {0} \n(\n  {1}{3}{2} \n); \n", GetQuotedTableName(modelDef), sbColumns, sbConstraints, sbPrimaryKeys));
+
+            return sql.ToString();
         }
     }
 }

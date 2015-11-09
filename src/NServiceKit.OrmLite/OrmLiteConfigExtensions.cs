@@ -22,7 +22,7 @@ using NServiceKit.Text;
 namespace NServiceKit.OrmLite
 {
     /// <summary>An ORM lite configuration extensions.</summary>
-    internal static class OrmLiteConfigExtensions
+    public static class OrmLiteConfigExtensions
     {
         /// <summary>The type model definition map.</summary>
         private static Dictionary<Type, ModelDefinition> typeModelDefinitionMap = new Dictionary<Type, ModelDefinition>();
@@ -67,7 +67,7 @@ namespace NServiceKit.OrmLite
         /// <summary>A Type extension method that gets model definition.</summary>
         /// <param name="modelType">The modelType to act on.</param>
         /// <returns>The model definition.</returns>
-        internal static ModelDefinition GetModelDefinition(this Type modelType)
+        public static ModelDefinition GetModelDefinition(this Type modelType)
         {
             ModelDefinition modelDef;
 
